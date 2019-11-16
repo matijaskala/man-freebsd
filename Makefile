@@ -1,5 +1,7 @@
 BINDIR=$(DESTDIR)/usr/bin
 
+all:
+
 install:
 	install -d $(BINDIR)
 	install -T man.sh $(BINDIR)/man

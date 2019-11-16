@@ -610,7 +610,7 @@ man_setup() {
 		MACHINE=${mflag##*:}
 	fi
 	if [ -z "$MACHINE_ARCH" ]; then
-		MACHINE_ARCH=$(uname -m)
+		MACHINE_ARCH=$(arch)
 	fi
 	if [ -z "$MACHINE" ]; then
 		MACHINE=$(uname -m)
@@ -889,8 +889,8 @@ search_whatis() {
 # Finds an appropriate decompressor based on extension
 setup_cattool() {
 	case "$1" in
-	*.bz)	cattool='/usr/bin/bzcat' ;;
-	*.bz2)	cattool='/usr/bin/bzcat' ;;
+	*.bz)	cattool='bzcat' ;;
+	*.bz2)	cattool='bzcat' ;;
 	*.gz)	cattool='/usr/bin/zcat' ;;
 	*.lzma)	cattool='/usr/bin/lzcat' ;;
 	*.xz)	cattool='/usr/bin/xzcat' ;;
