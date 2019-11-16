@@ -369,7 +369,7 @@ man_display_page() {
 # Usage: man_display_page_groff
 # Display the manpage using groff
 man_display_page_groff() {
-	local EQN NROFF PIC TBL TROFF REFER VGRIND
+	local EQN NROFF="$NROFF" PIC TBL="$TBL" TROFF REFER VGRIND
 	local IFS l nroff_dev pipeline preproc_arg tool
 
 	# So, we really do need to parse the manpage. First, figure out the
