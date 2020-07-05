@@ -875,11 +875,11 @@ search_whatis() {
 	bad=${bad#\\n}
 
 	if [ -n "$good" ]; then
-		echo -e "$good" | $MANPAGER
+		echo "$good" | $MANPAGER
 	fi
 
 	if [ -n "$bad" ]; then
-		echo -e "$bad" >&2
+		echo "$bad" >&2
 	fi
 
 	exit $rval
@@ -957,14 +957,13 @@ whatis_usage() {
 
 # Supported commands
 do_apropos() {
-	[ $(stat -f %i /usr/bin/man) -ne $(stat -f %i /usr/bin/apropos) ] && \
-		exec apropos "$@"
 	search_whatis apropos "$@"
 }
 
 do_man() {
 	man_parse_args "$@"
 	if [ -z "$pages" ]; then
+		[ -n "$wflag" ] && do_manpath
 		echo 'What manual page do you want?' >&2
 		exit 1
 	fi
@@ -994,8 +993,6 @@ do_manpath() {
 }
 
 do_whatis() {
-	[ $(stat -f %i /usr/bin/man) -ne $(stat -f %i /usr/bin/whatis) ] && \
-		exec whatis "$@"
 	search_whatis whatis "$@"
 }
 
