@@ -450,7 +450,7 @@ man_find_and_display() {
 	IFS=:
 	for sect in $MANSECT; do
 		case "$1" in *.$sect)
-			manless="${MANLESS:-" Manual page $1($sect) ?ltline %lt?L/%L.:byte %bB?s/%s..?e (END):?pB %pB\%.."}"
+			manless="${MANLESS:-" Manual page ${1%.$sect}($sect) ?ltline %lt?L/%L.:byte %bB?s/%s..?e (END):?pB %pB\%.."}"
 			for path in $MANPATH; do
 				for locpath in $locpaths; do
 					p=$path/$locpath
