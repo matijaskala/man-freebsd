@@ -288,7 +288,7 @@ man_check_for_so() {
 		.so*)	trim "${line#.so}"
 			decho "$manpage includes $tstr"
 			# Glob and check for the file.
-			if ! check_man "$path/$tstr*" ""; then
+			if ! check_man "${manpage%/*}/$tstr*" ""; then
 				decho "  Unable to find $tstr"
 				return 1
 			fi
@@ -340,60 +340,36 @@ man_display_page() {
 	fi
 	testline="mandoc -Tlint -Wunsupp >/dev/null 2>&1"
 	if [ -n "$tflag" ]; then
-		pipeline="mandoc -Tps $mandoc_args"
+		pipeline="| mandoc -Tps $mandoc_args"
 	else
-		pipeline="mandoc $mandoc_args | $MANPAGER"
+		pipeline="| mandoc $mandoc_args | $MANPAGER"
 	fi
 
 	if ! eval "$cattool $manpage | $testline" ;then
-		if which groff > /dev/null 2> /dev/null; then
-			man_display_page_groff
-		else
-			echo "This manpage needs groff(1) to be rendered" >&2
-			echo "First install groff(1): " >&2
-			echo "pkg install groff " >&2
-			ret=1
-		fi
+		man_display_page_troff
 		return
 	fi
 
 	if [ $debug -gt 0 ]; then
-		decho "Command: $cattool $manpage | $pipeline"
+		decho "Command: $cattool $manpage $pipeline"
 		ret=0
 	else
-		eval "$cattool $manpage | $pipeline"
+		eval "$cattool $manpage $pipeline"
 		ret=$?
 	fi
 }
 
-# Usage: man_display_page_groff
-# Display the manpage using groff
-man_display_page_groff() {
-	local EQN NROFF="$NROFF" PIC TBL="$TBL" TROFF REFER VGRIND
-	local IFS l nroff_dev pipeline preproc_arg tool
-
-	# So, we really do need to parse the manpage. First, figure out the
-	# device flag (-T) we have to pass to eqn(1) and groff(1). Then,
-	# setup the pipeline of commands based on the user's request.
+# Usage: man_display_page_troff
+# Display the manpage using troff
+man_display_page_troff() {
+	local EQN="$EQN" NROFF="$NROFF" PIC="$PIC" TBL="$TBL" TROFF="$TROFF" REFER="$REFER" VGRIND="$VGRIND"
+	local IFS l pipeline="" preproc_arg tool
 
 	# If the manpage is from a particular charset, we need to setup nroff
 	# to properly output for the correct device.
 	case "${manpage}" in
 	*.${man_charset}/*)
-		# I don't pretend to know this; I'm just copying from the
-		# previous version of man(1).
-		case "$man_charset" in
-		KOI8-R)		nroff_dev="koi8-r" ;;
-		ISO8859-1)	nroff_dev="latin1" ;;
-		ISO8859-15)	nroff_dev="latin1" ;;
-		UTF-8)		nroff_dev="utf8" ;;
-		*)		nroff_dev="ascii" ;;
-		esac
-
-		NROFF="$NROFF -T$nroff_dev"
-		EQN="$EQN -T$nroff_dev"
-
-		# Iff the manpage is from the locale and not just the charset,
+		# If the manpage is from the locale and not just the charset,
 		# then we need to define the locale string.
 		case "${manpage}" in
 		*/${man_lang}_${man_country}.${man_charset}/*)
@@ -411,14 +387,7 @@ man_display_page_groff() {
 			eval "$tool=\${${tool}_$l:-\$$tool}"
 		done
 		;;
-	*)	NROFF="$NROFF -Tascii"
-		EQN="$EQN -Tascii"
-		;;
 	esac
-
-	if [ -z "$MANCOLOR" ]; then
-		NROFF="$NROFF -P-c"
-	fi
 
 	if [ -n "${use_width}" ]; then
 		NROFF="$NROFF -rLL=${use_width}n -rLT=${use_width}n"
@@ -429,7 +398,7 @@ man_display_page_groff() {
 		while getopts 'egprtv' preproc_arg; do
 			case "${preproc_arg}" in
 			e)	pipeline="$pipeline | $EQN" ;;
-			g)	;; # Ignore for compatibility.
+			g)	pipeline="$pipeline | grap" ;;
 			p)	pipeline="$pipeline | $PIC" ;;
 			r)	pipeline="$pipeline | $REFER" ;;
 			t)	pipeline="$pipeline | $TBL" ;;
@@ -437,23 +406,19 @@ man_display_page_groff() {
 			*)	usage ;;
 			esac
 		done
-		# Strip the leading " | " from the resulting pipeline.
-		pipeline="${pipeline#" | "}"
-	else
-		pipeline="$TBL"
 	fi
 
 	if [ -n "$tflag" ]; then
 		pipeline="$pipeline | $TROFF"
 	else
-		pipeline="$pipeline | $NROFF | $MANPAGER"
+		pipeline="$pipeline | $NROFF 2> /dev/null | $MANPAGER"
 	fi
 
 	if [ $debug -gt 0 ]; then
-		decho "Command: $cattool $manpage | $pipeline"
+		decho "Command: $cattool $manpage $pipeline"
 		ret=0
 	else
-		eval "$cattool $manpage | $pipeline"
+		eval "$cattool $manpage $pipeline"
 		ret=$?
 	fi
 }
@@ -479,6 +444,52 @@ man_find_and_display() {
 		fi
 		;;
 	esac
+
+	IFS=:
+	for sect in $MANSECT; do
+		case "$1" in *.$sect) for path in $MANPATH; do
+			for locpath in $locpaths; do
+				p=$path/$locpath
+				p=${p%/.} # Rid ourselves of the trailing /.
+
+				if find_file $p $sect $MACHINE "${1%.$sect}"; then
+					if man_check_for_so $manpage $p; then
+						found_page=yes
+						man_display_page
+						if [ -n "$aflag" ]; then
+							continue 2
+						else
+							return
+						fi
+					fi
+				fi
+
+				if find_file $p $sect $MACHINE_ARCH "${1%.$sect}"; then
+					if man_check_for_so $manpage $p; then
+						found_page=yes
+						man_display_page
+						if [ -n "$aflag" ]; then
+							continue 2
+						else
+							return
+						fi
+					fi
+				fi
+
+				if find_file $p $sect '' "${1%.$sect}"; then
+					if man_check_for_so $manpage $p; then
+						found_page=yes
+						man_display_page
+						if [ -n "$aflag" ]; then
+							continue 2
+						else
+							return
+						fi
+					fi
+				fi
+			done
+		done ;; esac
+	done
 
 	IFS=:
 	for sect in $MANSECT; do
@@ -904,15 +915,11 @@ setup_cattool() {
 setup_pager() {
 	# Setup pager.
 	if [ -z "$MANPAGER" ]; then
-		if [ -n "$MANCOLOR" ]; then
-			MANPAGER="less -sR"
-		else
 			if [ -n "$PAGER" ]; then
 				MANPAGER="$PAGER"
 			else
 				MANPAGER="less -s"
 			fi
-		fi
 	fi
 	decho "Using pager: $MANPAGER"
 }
@@ -996,21 +1003,26 @@ do_whatis() {
 	search_whatis whatis "$@"
 }
 
-# User's PATH setting decides on the groff-suite to pick up.
+# User's PATH setting decides on the doctools to pick up.
 EQN=eqn
-NROFF='groff -S -P-h -Wall -mtty-char -man'
+NROFF='GROFF_NO_SGR=1 nroff -h -mandoc -Tlocale'
 PIC=pic
 REFER=refer
 TBL=tbl
-TROFF='groff -S -man'
 VGRIND=vgrind
+
+if command -v groff > /dev/null ; then
+	TROFF='groff -mandoc'
+else
+	TROFF='troff -mandoc'
+fi
 
 LOCALE=/usr/bin/locale
 STTY=/bin/stty
 SYSCTL=/sbin/sysctl
 
 debug=0
-man_default_sections='1:8:2:3:n:4:5:6:7:9:l'
+man_default_sections='1:1p:8:2:3:3p:n:4:5:6:7:9:0p:l'
 man_default_path='/usr/share/man:/usr/share/openssl/man:/usr/local/share/man:/usr/local/man'
 cattool='/usr/bin/zcat -f'
 
