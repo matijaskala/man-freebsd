@@ -309,7 +309,7 @@ man_display_page() {
 	# things to happen for the variables that have spaces in them.
 	unset IFS
 
-	export LESS="-isMPm$MANLESS\$-PM$MANLESS\$"
+	export LESS="-isMPm$manless\$-PM$manless\$"
 
 	# If we are supposed to use a catpage and we aren't using troff(1)
 	# just zcat the catpage and we are done.
@@ -450,7 +450,7 @@ man_find_and_display() {
 	IFS=:
 	for sect in $MANSECT; do
 		case "$1" in *.$sect)
-			MANLESS="${MANLESS:-" Manual page $1($sect) ?ltline %lt?L/%L.:byte %bB?s/%s..?e (END):?pB %pB\%.."}"
+			manless="${MANLESS:-" Manual page $1($sect) ?ltline %lt?L/%L.:byte %bB?s/%s..?e (END):?pB %pB\%.."}"
 			for path in $MANPATH; do
 				for locpath in $locpaths; do
 					p=$path/$locpath
@@ -498,7 +498,7 @@ man_find_and_display() {
 
 	IFS=:
 	for sect in $MANSECT; do
-		MANLESS="${MANLESS:-" Manual page $1($sect) ?ltline %lt?L/%L.:byte %bB?s/%s..?e (END):?pB %pB\%.."}"
+		manless="${MANLESS:-" Manual page $1($sect) ?ltline %lt?L/%L.:byte %bB?s/%s..?e (END):?pB %pB\%.."}"
 		decho "Searching section $sect" 2
 		for path in $MANPATH; do
 			for locpath in $locpaths; do
