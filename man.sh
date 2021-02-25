@@ -309,6 +309,8 @@ man_display_page() {
 	# things to happen for the variables that have spaces in them.
 	unset IFS
 
+	export LESS="-isMPm$MANLESS\$-PM$MANLESS\$"
+
 	# If we are supposed to use a catpage and we aren't using troff(1)
 	# just zcat the catpage and we are done.
 	if [ -z "$tflag" -a -n "$use_cat" ]; then
@@ -447,52 +449,56 @@ man_find_and_display() {
 
 	IFS=:
 	for sect in $MANSECT; do
-		case "$1" in *.$sect) for path in $MANPATH; do
-			for locpath in $locpaths; do
-				p=$path/$locpath
-				p=${p%/.} # Rid ourselves of the trailing /.
+		case "$1" in *.$sect)
+			MANLESS="${MANLESS:-" Manual page $1($sect) ?ltline %lt?L/%L.:byte %bB?s/%s..?e (END):?pB %pB\%.."}"
+			for path in $MANPATH; do
+				for locpath in $locpaths; do
+					p=$path/$locpath
+					p=${p%/.} # Rid ourselves of the trailing /.
 
-				if find_file $p $sect $MACHINE "${1%.$sect}"; then
-					if man_check_for_so $manpage $p; then
-						found_page=yes
-						man_display_page
-						if [ -n "$aflag" ]; then
-							continue 2
-						else
-							return
+					if find_file $p $sect $MACHINE "${1%.$sect}"; then
+						if man_check_for_so $manpage $p; then
+							found_page=yes
+							man_display_page
+							if [ -n "$aflag" ]; then
+								continue 2
+							else
+								return
+							fi
 						fi
 					fi
-				fi
 
-				if find_file $p $sect $MACHINE_ARCH "${1%.$sect}"; then
-					if man_check_for_so $manpage $p; then
-						found_page=yes
-						man_display_page
-						if [ -n "$aflag" ]; then
-							continue 2
-						else
-							return
+					if find_file $p $sect $MACHINE_ARCH "${1%.$sect}"; then
+						if man_check_for_so $manpage $p; then
+							found_page=yes
+							man_display_page
+							if [ -n "$aflag" ]; then
+								continue 2
+							else
+								return
+							fi
 						fi
 					fi
-				fi
 
-				if find_file $p $sect '' "${1%.$sect}"; then
-					if man_check_for_so $manpage $p; then
-						found_page=yes
-						man_display_page
-						if [ -n "$aflag" ]; then
-							continue 2
-						else
-							return
+					if find_file $p $sect '' "${1%.$sect}"; then
+						if man_check_for_so $manpage $p; then
+							found_page=yes
+							man_display_page
+							if [ -n "$aflag" ]; then
+								continue 2
+							else
+								return
+							fi
 						fi
 					fi
-				fi
-			done
-		done ;; esac
+				done
+			done ;;
+		esac
 	done
 
 	IFS=:
 	for sect in $MANSECT; do
+		MANLESS="${MANLESS:-" Manual page $1($sect) ?ltline %lt?L/%L.:byte %bB?s/%s..?e (END):?pB %pB\%.."}"
 		decho "Searching section $sect" 2
 		for path in $MANPATH; do
 			for locpath in $locpaths; do
@@ -915,13 +921,17 @@ setup_cattool() {
 setup_pager() {
 	# Setup pager.
 	if [ -z "$MANPAGER" ]; then
-			if [ -n "$PAGER" ]; then
-				MANPAGER="$PAGER"
-			else
-				MANPAGER="less -s"
-			fi
+		MANPAGER="${PAGER:-less}"
 	fi
 	decho "Using pager: $MANPAGER"
+
+	export LESS_TERMCAP_mb="${LESS_TERMCAP_mb:-$(printf "\33[5;31m")}"
+	export LESS_TERMCAP_md="${LESS_TERMCAP_md:-$(printf "\33[1;36m")}"
+	export LESS_TERMCAP_me="${LESS_TERMCAP_me:-$(printf "\33[0m")}"
+	export LESS_TERMCAP_us="${LESS_TERMCAP_us:-$(printf "\33[4;32m")}"
+	export LESS_TERMCAP_ue="${LESS_TERMCAP_ue:-$(printf "\33[0m")}"
+	export LESS_TERMCAP_so="${LESS_TERMCAP_so:-$(printf "\33[1;38;5;100;46m")}"
+	export LESS_TERMCAP_se="${LESS_TERMCAP_se:-$(printf "\33[0m")}"
 }
 
 # Usage: trim string
