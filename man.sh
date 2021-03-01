@@ -288,7 +288,7 @@ man_check_for_so() {
 		.so*)	trim "${line#.so}"
 			decho "$manpage includes $tstr"
 			# Glob and check for the file.
-			if ! check_man "${manpage%/*}/$tstr*" ""; then
+			if ! check_man "$path/$tstr*" "" && ! check_man "${manpage%/*}/$tstr*" ""; then
 				decho "  Unable to find $tstr"
 				return 1
 			fi
