@@ -930,7 +930,7 @@ setup_pager() {
 	export LESS_TERMCAP_me="${LESS_TERMCAP_me:-$(printf "\33[0m")}"
 	export LESS_TERMCAP_us="${LESS_TERMCAP_us:-$(printf "\33[4;32m")}"
 	export LESS_TERMCAP_ue="${LESS_TERMCAP_ue:-$(printf "\33[0m")}"
-	export LESS_TERMCAP_so="${LESS_TERMCAP_so:-$(printf "\33[1;38;5;100;46m")}"
+	export LESS_TERMCAP_so="${LESS_TERMCAP_so:-$(printf "\33[1;38;5;100;48;5;50m")}"
 	export LESS_TERMCAP_se="${LESS_TERMCAP_se:-$(printf "\33[0m")}"
 }
 
