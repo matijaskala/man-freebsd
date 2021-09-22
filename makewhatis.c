@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <ctype.h>
 #include <dirent.h>
 #include <err.h>
+#include <signal.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1049,10 +1050,11 @@ main(int argc, char **argv)
 		}
 	}
 
-	signal(SIGINT, trap_signal);
-	signal(SIGHUP, trap_signal);
-	signal(SIGQUIT, trap_signal);
-	signal(SIGTERM, trap_signal);
+	struct sigaction sa_old, sa = { .sa_handler = trap_signal, .sa_flags = 0 };
+	sigaction(SIGINT, &sa, &sa_old);
+	sigaction(SIGHUP, &sa, &sa_old);
+	sigaction(SIGQUIT, &sa, &sa_old);
+	sigaction(SIGTERM, &sa, &sa_old);
 	SLIST_INIT(&visited_dirs);
 	whatis_proto = new_sbuf();
 	whatis_final = new_sbuf();
