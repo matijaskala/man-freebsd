@@ -1,6 +1,6 @@
 #! /bin/sh
 #
-# SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+# SPDX-License-Identifier: BSD-2-Clause
 #
 #  Copyright (c) 2010 Gordon Tetlow
 #  All rights reserved.
@@ -26,7 +26,12 @@
 #  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 #  SUCH DAMAGE.
 #
-# $FreeBSD$
+
+# Rendering a manual page is fast. Even a manual page several 100k in size
+# takes less than a CPU second. If it takes much longer, it is very likely
+# that a tool like mandoc(1) is running in an infinite loop. In this case
+# it is better to terminate it.
+ulimit -t 20
 
 # Usage: add_to_manpath path
 # Adds a variable to manpath while ensuring we don't have duplicates.
@@ -61,6 +66,25 @@ build_manlocales() {
 	MANLOCALES=${manlocales#:}
 
 	decho "Available manual locales: $MANLOCALES"
+}
+
+# Usage: build_mansect
+# Builds a correct MANSECT variable.
+build_mansect() {
+	# If the user has set mansect, who are we to argue.
+	if [ -n "$MANSECT" ]; then
+		return
+	fi
+
+	parse_configs
+
+	# Trim leading colon
+	MANSECT=${mansect#:}
+
+	if [ -z "$MANSECT" ]; then
+		MANSECT=$man_default_sections
+	fi
+	decho "Using manual sections: $MANSECT"
 }
 
 # Usage: build_manpath
@@ -559,14 +583,16 @@ man_find_and_display() {
 	fi
 }
 
-# Usage: man_parse_args "$@"
+# Usage: man_parse_opts "$@"
 # Parses commandline options for man.
-man_parse_args() {
-	local IFS cmd_arg
+man_parse_opts() {
+	local cmd_arg
 
 	OPTIND=1
-	while getopts 'M:P:S:adfhkm:op:tw' cmd_arg; do
+	while getopts 'K:M:P:S:adfhkm:op:tw' cmd_arg; do
 		case "${cmd_arg}" in
+		K)	Kflag=Kflag
+			REGEXP=$OPTARG ;;
 		M)	MANPATH=$OPTARG ;;
 		P)	MANPAGER=$OPTARG ;;
 		S)	MANSECT=$OPTARG ;;
@@ -587,7 +613,11 @@ man_parse_args() {
 	shift $(( $OPTIND - 1 ))
 
 	# Check the args for incompatible options.
-	case "${fflag}${kflag}${tflag}${wflag}" in
+
+	case "${Kflag}${fflag}${kflag}${tflag}${wflag}" in
+	Kflagfflag*)	echo "Incompatible options: -K and -f"; man_usage ;;
+	Kflag*kflag*)	echo "Incompatible options: -K and -k"; man_usage ;;
+	Kflag*tflag)	echo "Incompatible options: -K and -t"; man_usage ;;
 	fflagkflag*)	echo "Incompatible options: -f and -k"; man_usage ;;
 	fflag*tflag*)	echo "Incompatible options: -f and -t"; man_usage ;;
 	fflag*wflag)	echo "Incompatible options: -f and -w"; man_usage ;;
@@ -606,19 +636,6 @@ man_parse_args() {
 		do_apropos "$@"
 		exit
 	fi
-
-	IFS=:
-	for sect in $man_default_sections; do
-		if [ "$sect" = "$1" ]; then
-			decho "Detected manual section as first arg: $1"
-			MANSECT="$1"
-			shift
-			break
-		fi
-	done
-	unset IFS
-
-	pages="$*"
 }
 
 # Usage: man_setup
@@ -638,14 +655,8 @@ man_setup() {
 	decho "Using architecture: $MACHINE_ARCH:$MACHINE"
 
 	setup_pager
-
-	# Setup manual sections to search.
-	if [ -z "$MANSECT" ]; then
-		MANSECT=$man_default_sections
-	fi
-	decho "Using manual sections: $MANSECT"
-
 	build_manpath
+	build_mansect
 	man_setup_locale
 	man_setup_width
 }
@@ -728,7 +739,7 @@ man_setup_locale() {
 # Display usage for the man utility.
 man_usage() {
 	echo 'Usage:'
-	echo ' man [-adho] [-t | -w] [-M manpath] [-P pager] [-S mansect]'
+	echo ' man [-adho] [-t | -w] [-K regexp] [-M manpath] [-P pager] [-S mansect]'
 	echo '     [-m arch[:machine]] [-p [eprtv]] [mansect] page [...]'
 	echo ' man -f page [...] -- Emulates whatis(1)'
 	echo ' man -k page [...] -- Emulates apropos(1)'
@@ -791,6 +802,10 @@ parse_file() {
 		MANCONFIG*)	decho "    MANCONFIG" 3
 				trim "${line#MANCONFIG}"
 				config_local="$tstr"
+				;;
+		MANSECT*)	decho "    MANSECT" 3
+				trim "${line#MANSECT}"
+				mansect="$mansect:$tstr"
 				;;
 		# Set variables in the form of FOO_BAR
 		*_*[\ \	]*)	var="${line%%[\ \	]*}"
@@ -914,6 +929,7 @@ setup_cattool() {
 	*.gz)	cattool='/usr/bin/zcat' ;;
 	*.lzma)	cattool='/usr/bin/lzcat' ;;
 	*.xz)	cattool='/usr/bin/xzcat' ;;
+	*.zst)	cattool='/usr/bin/zstdcat' ;;
 	*.br)	cattool='/usr/bin/brcat' ;;
 	*)	cattool='/usr/bin/zcat -f' ;;
 	esac
@@ -981,14 +997,65 @@ do_apropos() {
 	search_whatis apropos "$@"
 }
 
+# Usage: do_full_search reg_exp
+# Do a full search of the regular expression passed
+# as parameter in all man pages
+do_full_search() {
+	local gflags re
+	re=${1}
+
+	# Build grep(1) flags
+	gflags="-H"
+
+	# wflag implies -l for grep(1)
+	if [ -n "$wflag" ]; then
+		gflags="${gflags} -l"
+	fi
+
+	gflags="${gflags} --label"
+
+	set +f
+	for mpath in $(echo "${MANPATH}" | tr : '[:blank:]'); do
+		for section in $(echo "${MANSECT}" | tr : '[:blank:]'); do
+			for manfile in ${mpath}/man${section}/*.${section}*; do
+				mandoc "${manfile}" 2>/dev/null |
+					grep -E ${gflags} "${manfile}" -e "${re}"
+			done
+		done
+	done
+	set -f
+}
+
 do_man() {
-	man_parse_args "$@"
-	if [ -z "$pages" ]; then
+	local IFS
+
+	man_parse_opts "$@"
+	man_setup
+
+	shift $(( $OPTIND - 1 ))
+	IFS=:
+	for sect in $MANSECT; do
+		if [ "$sect" = "$1" ]; then
+			decho "Detected manual section as first arg: $1"
+			MANSECT="$1"
+			shift
+			break
+		fi
+	done
+	unset IFS
+	pages="$*"
+
+	if [ -z "$pages" -a -z "${Kflag}" ]; then
 		[ -n "$wflag" ] && do_manpath
 		echo 'What manual page do you want?' >&2
 		exit 1
 	fi
-	man_setup
+
+	if [ ! -z "${Kflag}" ]; then
+		# Short circuit because -K flag does a sufficiently
+		# different thing like not showing the man page at all
+		do_full_search "${REGEXP}"
+	fi
 
 	for page in $pages; do
 		decho "Searching for $page"

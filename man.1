@@ -23,9 +23,7 @@
 .\"  OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\"  SUCH DAMAGE.
 .\"
-.\" $FreeBSD$
-.\"
-.Dd August 8, 2018
+.Dd January 26, 2022
 .Dt MAN 1
 .Os
 .Sh NAME
@@ -42,6 +40,9 @@
 .Op Fl p Op Ar eprtv
 .Op Ar mansect
 .Ar page ...
+.Nm
+.Fl K
+.Ar regexp ...
 .Nm
 .Fl f
 .Ar keyword ...
@@ -93,6 +94,14 @@ Options that
 .Nm
 understands:
 .Bl -tag -width indent
+.It Fl K Ar regexp
+Does a full text search in all manual pages.
+.Ar regexp
+is a regular expression as understood by
+.Dq Li "grep -E" .
+This option requires
+.Xr mandoc 1 .
+This is a slow operation.
 .It Fl M Ar manpath
 Forces a specific colon separated manual path instead of the default
 search path.
